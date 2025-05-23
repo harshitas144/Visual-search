@@ -1,0 +1,12 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+python-multipart==0.0.9
+pandas==2.2.2
+pillow==10.4.0
+torch==2.3.1
+transformers==4.44.2
+ultralytics==8.2.82
+opencv-python==4.10.0.84
+numpy==1.26.4
+pinecone-client==5.0.1
+gunicorn==22.0.0
