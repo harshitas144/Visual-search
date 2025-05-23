@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Search Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.9/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        h1, h2, h3 {
+            font-family: 'Poppins', sans-serif;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px) rotate(2deg); }
+            to { opacity: 1; transform: translateY(0) rotate(0deg); }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(0, 255, 255, 1); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        @keyframes click {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+        .animate-slideUp {
+            animation: slideUp 0.8s ease-out forwards;
+        }
+        .animate-glow:hover {
+            animation: glow 1.5s infinite;
+        }
+        .animate-shake {
+            animation: shake 0.3s ease-in-out;
+        }
+        .animate-click {
+            animation: click 0.2s ease-in-out;
+        }
+        .header-underline::after {
+            content: '';
+            display: block;
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(to right, #00ddeb, #3b82f6);
+            margin: 8px auto 0;
+            border-radius: 2px;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-border {
+            border: 2px solid transparent;
+            background: linear-gradient(white, white) padding-box, linear-gradient(to right, #00ddeb, #3b82f6) border-box;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-200 via-purple-200 to-pink-200 min-h-screen">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('text');
+            const [textQuery, setTextQuery] = useState('');
+            const [imageFile, setImageFile] = useState(null);
+            const [imagePreview, setImagePreview] = useState('');
+            const [results, setResults] = useState([]);
+            const [message, setMessage] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [shake, setShake] = useState(false);
+            const [clickedIndex, setClickedIndex] = useState(null);
+
+            // Deduplicate results based on Title, Price, and Website
+            const deduplicateResults = (results) => {
+                const seen = new Set();
+                return results.filter((result) => {
+                    const key = `${result.Title}|${result.Price}|${result.Website}`;
+                    if (seen.has(key)) {
+                        return false;
+                    }
+                    seen.add(key);
+                    return true;
+                });
+            };
+
+            const handleTextSearch = async () => {
+                if (!textQuery) {
+                    setMessage('Please enter a search query.');
+                    setResults([]);
+                    setShake(true);
+                    setTimeout(() => setShake(false), 300);
+                    return;
+                }
+                setLoading(true);
+                setMessage('');
+                try {
+                    const response = await axios.get('http://localhost:8000/text-search', {
+                        params: { query: textQuery }
+                    });
+                    const uniqueResults = deduplicateResults(response.data.results);
+                    setResults(uniqueResults);
+                    setMessage(response.data.message);
+                } catch (error) {
+                    setMessage('Error performing text search: ' + error.message);
+                    setResults([]);
+                }
+                setLoading(false);
+            };
+
+            const handleImageSearch = async () => {
+                if (!imageFile) {
+                    setMessage('Please upload an image.');
+                    setResults([]);
+                    setShake(true);
+                    setTimeout(() => setShake(false), 300);
+                    return;
+                }
+                setLoading(true);
+                setMessage('');
+                try {
+                    const formData = new FormData();
+                    formData.append('file', imageFile);
+                    const response = await axios.post('http://localhost:8000/image-search', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    const uniqueResults = deduplicateResults(response.data.results);
+                    setResults(uniqueResults);
+                    setMessage(response.data.message);
+                } catch (error) {
+                    setMessage('Error performing image search: ' + error.message);
+                    setResults([]);
+                }
+                setLoading(false);
+            };
+
+            const handleImageChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    setImageFile(file);
+                    const reader = new FileReader();
+                    reader.onloadend = () => setImagePreview(reader.result);
+                    reader.readAsDataURL(file);
+                } else {
+                    setImageFile(null);
+                    setImagePreview('');
+                }
+            };
+
+            const handleTabChange = (tab) => {
+                setActiveTab(tab);
+                setResults([]);
+                setMessage('');
+                setShake(false);
+                setClickedIndex(null);
+            };
+
+            const handleCardClick = (index) => {
+                setClickedIndex(index);
+                setTimeout(() => setClickedIndex(null), 200); // Reset after animation
+            };
+
+            return (
+                <div className="flex flex-col min-h-screen">
+                    {/* Header */}
+                    <header className="sticky top-0 z-10 bg-gradient-to-r from-cyan-600 to-blue-700 shadow-lg animate-slideUp">
+                        <div className="w-full px-2 sm:px-4 lg:px-6 py-4">
+                            <h1 className="text-4xl font-bold text-white text-center hover:scale-105 transition-transform duration-300 header-underline font-poppins">
+                                Product Search Engine
+                            </h1>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="flex-grow w-full px-2 sm:px-4 lg:px-6 py-8">
+                        <div className="glass rounded-xl shadow-2xl p-8">
+                            <p className="text-gray-800 text-lg mb-8 text-center font-medium font-roboto">Find your perfect product with text or image search</p>
+                            <div className="tabs">
+                                <div className="flex border-b border-gray-300">
+                                    <button
+                                        className={`flex-1 py-4 px-6 text-center font-medium text-lg transition-all duration-300 font-roboto ${
+                                            activeTab === 'text'
+                                                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-t-lg'
+                                                : 'text-gray-800 hover:bg-gray-100'
+                                        }`}
+                                        onClick={() => handleTabChange('text')}
+                                    >
+                                        Text Search
+                                    </button>
+                                    <button
+                                        className={`flex-1 py-4 px-6 text-center font-medium text-lg transition-all duration-300 font-roboto ${
+                                            activeTab === 'image'
+                                                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-t-lg'
+                                                : 'text-gray-800 hover:bg-gray-100'
+                                        }`}
+                                        onClick={() => handleTabChange('image')}
+                                    >
+                                        Image Search
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mt-8">
+                                {activeTab === 'text' && (
+                                    <div className="p-6">
+                                        <h2 className="text-2xl font-semibold text-gray-800 mb-6 font-poppins">Text Search</h2>
+                                        <div className={`flex gap-6 ${shake ? 'animate-shake' : ''}`}>
+                                            <input
+                                                type="text"
+                                                value={textQuery}
+                                                onChange={(e) => setTextQuery(e.target.value)}
+                                                placeholder="e.g., blue running shoes"
+                                                className="flex-1 p-5 gradient-border rounded-lg focus:ring-4 focus:ring-cyan-300 focus:border-transparent transition-all duration-200 text-lg font-roboto bg-gradient-to-r from-white/80 to-cyan-100/80 hover:scale-102"
+                                            />
+                                            <button
+                                                onClick={handleTextSearch}
+                                                className={`px-10 py-5 bg-gradient-to-r from-cyan-600 to-blue-700 text-white rounded-lg font-medium text-lg transition-all duration-200 flex items-center gap-2 hover:scale-105 animate-glow ${
+                                                    loading ? 'opacity-75 cursor-not-allowed animate-pulse' : ''
+                                                }`}
+                                                disabled={loading}
+                                            >
+                                                {loading ? (
+                                                    <>
+                                                        <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                        </svg>
+                                                        Searching...
+                                                    </>
+                                                ) : (
+                                                    'Search'
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                {activeTab === 'image' && (
+                                    <div className="p-6">
+                                        <h2 className="text-2xl font-semibold text-gray-800 mb-6 font-poppins">Image Search</h2>
+                                        <div className={`flex flex-col gap-6 ${shake ? 'animate-shake' : ''}`}>
+                                            <input
+                                                type="file"
+                                                accept="image/png,image/jpg,image/jpeg"
+                                                onChange={handleImageChange}
+                                                className="p-5 gradient-border rounded-lg transition-all duration-200 text-lg font-roboto bg-gradient-to-r from-white/80 to-cyan-100/80 hover:scale-102 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-cyan-500 file:to-blue-600 file:text-white hover:file:from-cyan-600 hover:file:to-blue-700 animate-glow"
+                                            />
+                                            {imagePreview && (
+                                                <img src={imagePreview} alt="Uploaded" className="max-w-sm rounded-lg shadow-md" />
+                                            )}
+                                            <button
+                                                onClick={handleImageSearch}
+                                                className={`px-10 py-5 bg-gradient-to-r from-cyan-600 to-blue-700 text-white rounded-lg font-medium text-lg transition-all duration-200 flex items-center gap-2 hover:scale-105 animate-glow w-fit ${
+                                                    loading ? 'opacity-75 cursor-not-allowed animate-pulse' : ''
+                                                }`}
+                                                disabled={loading}
+                                            >
+                                                {loading ? (
+                                                    <>
+                                                        <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                        </svg>
+                                                        Searching...
+                                                    </>
+                                                ) : (
+                                                    'Search'
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            {message && (
+                                <p className="mt-6 text-xl text-center text-gray-800 bg-white/50 p-4 rounded-lg font-roboto">{message}</p>
+                            )}
+                            {results.length > 0 && (
+                                <div className="mt-8 grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                                    {results.map((result, index) => (
+                                        <div
+                                            key={index}
+                                            className={`bg-gradient-to-br from-white/90 to-blue-50/50 p-5 rounded-lg shadow-md transition-all duration-300 animate-fadeIn w-full border-l-4 border-cyan-500 hover:scale-110 hover:shadow-2xl hover:-translate-y-2 hover:bg-gradient-to-br hover:from-white/90 hover:to-blue-100/70 ${clickedIndex === index ? 'animate-click' : ''}`}
+                                            style={{ animationDelay: `${index * 0.1}s` }}
+                                            onClick={() => handleCardClick(index)}
+                                        >
+                                            <h3 className="text-xl font-semibold text-gray-800 mb-3 font-poppins">{result.Title}</h3>
+                                            <p className="text-green-600 font-medium text-lg mb-3 font-roboto">{result.Price}</p>
+                                            <a
+                                                href={result.Website}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 text-cyan-600 hover:text-cyan-800 transition-colors duration-200 text-lg font-roboto"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                                                </svg>
+                                                {result.Website.length > 30 ? result.Website.slice(0, 30) + '...' : result.Website}
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="fixed bottom-0 w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-4 animate-slideUp">
+                        <div className="text-center">
+                            <p className="text-lg font-medium font-roboto">© 2025 Product Search Engine. All rights reserved.</p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
